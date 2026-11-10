@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#18251e" />
+  <title>Frontline: Green Defense</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="game-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Frontline Green Defense home">
+        <span class="brand-mark"><span></span><span></span><span></span></span>
+        <span class="brand-type"><b>FIELD COMMAND</b><small>BOTANICAL DEFENSE CORPS</small></span>
+      </a>
+      <div class="mission-tag"><i></i> OPERATION: GREEN THUMB <span>•</span> DAY 01</div>
+      <div class="top-actions"><span class="status-pill"><i></i> LIVE FIELD</span><button class="icon-btn" id="soundBtn" aria-label="Toggle sound" title="Sound on">♫</button></div>
+    </header>
+
+    <section class="intro-row">
+      <div><p class="eyebrow">THE GARDEN FRONT · SECTOR 07</p><h1>HOLD THE <em>LINE.</em></h1><p class="subtitle">The undead are marching. Dig in, grow strong, and protect the last green on earth.</p></div>
+      <div class="wave-box"><div class="wave-copy"><span class="eyebrow">CURRENT OPERATION</span><strong id="waveLabel">WAVE 01 <span>—</span> SCOUTING PARTY</strong></div><div class="wave-meter"><div id="waveProgress"></div></div><span class="wave-count" id="waveCount">0 / 8 HOSTILES</span></div>
+    </section>
+
+    <section class="battle-layout">
+      <aside class="command-panel">
+        <div class="panel-heading"><span>01</span><div><b>DEPLOY UNITS</b><small>SELECT A PLANT · THEN PICK A TILE</small></div></div>
+        <div class="resource-card"><div class="supply-icon">✦</div><div><small>FIELD SUPPLIES</small><strong id="sunCount">150</strong></div><span class="supply-label">SUN</span></div>
+        <div class="unit-list" id="unitList"></div>
+        <div class="panel-tip"><span class="tip-icon">⌖</span><div><b>FIELD MANUAL</b><p>Collect supply drops from the field. Plants need clear ground and enough sun to deploy.</p></div></div>
+        <div class="command-footer"><span><i></i> DEFENSES ACTIVE</span><span id="plantCount">0 UNITS</span></div>
+      </aside>
+
+      <section class="field-column">
+        <div class="field-toolbar"><div class="sector-label"><span class="map-pin">⌖</span><span><b>SECTOR 07</b><small>THE OLD HOMESTEAD</small></span></div><div class="battle-state"><i></i><span id="battleStatus">ENGAGEMENT IN PROGRESS</span></div><div class="field-controls"><button id="pauseBtn" class="control-btn" title="Pause (space)">Ⅱ <span>PAUSE</span></button><button id="restartBtn" class="control-btn" title="Restart mission">↻ <span>RESET</span></button></div></div>
+        <div class="canvas-wrap"><canvas id="battlefield" width="1000" height="590" aria-label="Battlefield. Select a plant, then click an empty tile to deploy it."></canvas><div class="field-overlay" id="fieldOverlay" hidden><div class="overlay-card"><span class="overlay-kicker">FIELD REPORT</span><h2 id="overlayTitle">MISSION COMPLETE</h2><p id="overlayText">The garden is safe. For now.</p><button id="overlayRestart">DEPLOY AGAIN <span>→</span></button></div></div><div class="toast" id="toast" aria-live="polite"></div></div>
+        <div class="field-legend"><span><i class="legend-plant"></i> FRIENDLY</span><span><i class="legend-zombie"></i> HOSTILE</span><span><i class="legend-drop">✦</i> SUPPLY DROP <b>· CLICK TO COLLECT</b></span><span class="keyboard-hint">KEYS <kbd>1</kbd>—<kbd>6</kbd> SELECT <kbd>SPACE</kbd> PAUSE</span></div>
+      </section>
+    </section>
+    <footer class="bottomline"><span>FIELD NOTES <b>·</b> KEEP YOUR UNITS PROTECTED</span><span>EST. 1944 <b>✳</b> GROWN TO DEFEND</span></footer>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
