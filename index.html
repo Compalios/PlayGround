@@ -7,38 +7,80 @@
   <title>Frontline: Green Defense</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" /></noscript>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div class="mission-screen" id="missionScreen" hidden>
+    <div class="mission-inner">
+      <header class="mission-top">
+        <a class="brand" href="#" aria-label="Frontline Green Defense">
+          <span class="brand-mark"><span></span><span></span><span></span></span>
+          <span class="brand-type"><b>FIELD COMMAND</b><small>BOTANICAL DEFENSE CORPS</small></span>
+        </a>
+        <button class="mission-close" id="missionsClose" title="Return to field">✕ <span>RETURN TO FIELD</span></button>
+      </header>
+      <section class="mission-hero">
+        <div>
+          <p class="eyebrow">BOTANICAL DEFENSE CORPS · CAMPAIGN</p>
+          <h2>CHOOSE YOUR <em>MISSION</em></h2>
+          <p class="mission-sub">Every sector you secure issues new units to the seed bank. Push the front line forward, one field at a time.</p>
+        </div>
+        <div class="mission-stats">
+          <div><small>SECTORS SECURED</small><strong id="msSectors">0 / 6</strong></div>
+          <div><small>COMMENDATIONS</small><strong id="msStars">0 / 18</strong></div>
+          <div><small>UNITS ISSUED</small><strong id="msUnits">2 / 6</strong></div>
+        </div>
+      </section>
+      <div class="mission-grid" id="missionGrid"></div>
+      <section class="seed-bank">
+        <div class="sb-head"><span>SEED BANK</span><small>UNITS ARE ISSUED AS SECTORS FALL</small></div>
+        <div class="sb-units" id="seedBank"></div>
+      </section>
+      <footer class="mission-foot">
+        <span><i></i> PROGRESS SAVES AUTOMATICALLY</span>
+        <button id="resetProgress" title="Erase campaign progress">RESET CAMPAIGN</button>
+      </footer>
+    </div>
+  </div>
+
   <main class="game-shell">
     <header class="topbar">
       <a class="brand" href="#" aria-label="Frontline Green Defense home">
         <span class="brand-mark"><span></span><span></span><span></span></span>
         <span class="brand-type"><b>FIELD COMMAND</b><small>BOTANICAL DEFENSE CORPS</small></span>
       </a>
-      <div class="mission-tag"><i></i> OPERATION: GREEN THUMB <span>•</span> DAY 01</div>
-      <div class="top-actions"><span class="status-pill"><i></i> LIVE FIELD</span><button class="icon-btn" id="soundBtn" aria-label="Toggle sound" title="Sound on">♫</button></div>
+      <div class="mission-tag" id="missionTag"><i></i> OPERATION: GREEN THUMB <span>•</span> LEVEL 01</div>
+      <div class="top-actions"><span class="status-pill" id="campaignChip"><i></i> CAMPAIGN ★ 0 / 18</span><button class="icon-btn" id="soundBtn" aria-label="Toggle sound" title="Sound on">♫</button></div>
     </header>
 
     <section class="intro-row">
-      <div><p class="eyebrow">THE GARDEN FRONT · SECTOR 07</p><h1>HOLD THE <em>LINE.</em></h1><p class="subtitle">The undead are marching. Dig in, grow strong, and protect the last green on earth.</p></div>
-      <div class="wave-box"><div class="wave-copy"><span class="eyebrow">CURRENT OPERATION</span><strong id="waveLabel">WAVE 01 <span>—</span> SCOUTING PARTY</strong></div><div class="wave-meter"><div id="waveProgress"></div></div><span class="wave-count" id="waveCount">0 / 8 HOSTILES</span></div>
+      <div><p class="eyebrow" id="introEyebrow">THE OLD HOMESTEAD · SECTOR 07</p><h1 id="introTitle">FIRST <em>CONTACT.</em></h1><p class="subtitle" id="introSub">A handful of stragglers are testing the east fence. Plant your first line and hold the lawn.</p></div>
+      <div class="wave-box"><div class="wave-copy"><span class="eyebrow" id="waveEyebrow">LEVEL 01 · WAVE 1 OF 2</span><strong id="waveLabel">WAVE 01 <span>—</span> STRAYS</strong></div><div class="wave-meter"><div id="waveProgress"></div></div><span class="wave-count" id="waveCount">0 / 4 HOSTILES</span></div>
     </section>
 
     <section class="battle-layout">
       <aside class="command-panel">
-        <div class="panel-heading"><span>01</span><div><b>DEPLOY UNITS</b><small>SELECT A PLANT · THEN PICK A TILE</small></div></div>
+        <div class="panel-heading"><span id="panelLevel">01</span><div><b>DEPLOY UNITS</b><small>SELECT A PLANT · THEN PICK A TILE</small></div></div>
         <div class="resource-card"><div class="supply-icon">✦</div><div><small>FIELD SUPPLIES</small><strong id="sunCount">150</strong></div><span class="supply-label">SUN</span></div>
         <div class="unit-list" id="unitList"></div>
-        <div class="panel-tip"><span class="tip-icon">⌖</span><div><b>FIELD MANUAL</b><p>Collect supply drops from the field. Plants need clear ground and enough sun to deploy.</p></div></div>
+        <div class="mission-intel">
+          <div class="intel-title"><span>MISSION INTEL</span><b id="intelWaves">2 WAVES</b></div>
+          <div class="intel-rows">
+            <div><small>LANES TO HOLD</small><b id="intelLanes">3</b></div>
+            <div><small>MOWERS</small><b id="intelMowers">3</b></div>
+            <div><small>HOSTILES</small><b id="intelFoes">10</b></div>
+          </div>
+        </div>
+        <div class="panel-tip"><span class="tip-icon">⌖</span><div><b>FIELD MANUAL</b><p>Collect supply drops from the field. Locked units are issued as you secure new sectors.</p></div></div>
         <div class="command-footer"><span><i></i> DEFENSES ACTIVE</span><span id="plantCount">0 UNITS</span></div>
       </aside>
 
       <section class="field-column">
-        <div class="field-toolbar"><div class="sector-label"><span class="map-pin">⌖</span><span><b>SECTOR 07</b><small>THE OLD HOMESTEAD</small></span></div><div class="battle-state"><i></i><span id="battleStatus">ENGAGEMENT IN PROGRESS</span></div><div class="field-controls"><button id="pauseBtn" class="control-btn" title="Pause (space)">Ⅱ <span>PAUSE</span></button><button id="restartBtn" class="control-btn" title="Restart mission">↻ <span>RESET</span></button></div></div>
-        <div class="canvas-wrap"><canvas id="battlefield" width="1000" height="590" aria-label="Battlefield. Select a plant, then click an empty tile to deploy it."></canvas><div class="field-overlay" id="fieldOverlay" hidden><div class="overlay-card"><span class="overlay-kicker">FIELD REPORT</span><h2 id="overlayTitle">MISSION COMPLETE</h2><p id="overlayText">The garden is safe. For now.</p><button id="overlayRestart">DEPLOY AGAIN <span>→</span></button></div></div><div class="toast" id="toast" aria-live="polite"></div></div>
-        <div class="field-legend"><span><i class="legend-plant"></i> FRIENDLY</span><span><i class="legend-zombie"></i> HOSTILE</span><span><i class="legend-drop">✦</i> SUPPLY DROP <b>· CLICK TO COLLECT</b></span><span class="keyboard-hint">KEYS <kbd>1</kbd>—<kbd>6</kbd> SELECT <kbd>SPACE</kbd> PAUSE</span></div>
+        <div class="field-toolbar"><div class="sector-label"><span class="map-pin">⌖</span><span><b id="sectorName">THE OLD HOMESTEAD</b><small id="sectorSub">SECTOR 07 · FIRST CONTACT</small></span></div><div class="battle-state"><i></i><span id="battleStatus">ENGAGEMENT IN PROGRESS</span></div><div class="field-controls"><button id="missionsBtn" class="control-btn" title="Mission select (M)">☰ <span>MISSIONS</span></button><button id="pauseBtn" class="control-btn" title="Pause (space)">Ⅱ <span>PAUSE</span></button><button id="restartBtn" class="control-btn" title="Restart mission">↻ <span>RESET</span></button></div></div>
+        <div class="canvas-wrap"><canvas id="battlefield" width="1000" height="590" aria-label="Battlefield. Select a plant, then click an empty tile to deploy it."></canvas><div class="field-overlay" id="fieldOverlay" hidden><div class="overlay-card"><span class="overlay-kicker" id="overlayKicker">FIELD REPORT</span><h2 id="overlayTitle">SECTOR SECURED</h2><div class="overlay-stars" id="overlayStars" hidden></div><p id="overlayText">The garden is safe. For now.</p><div class="overlay-reward" id="overlayReward" hidden></div><div class="overlay-actions"><button id="overlayPrimary">NEXT MISSION <span>→</span></button><button id="overlaySecondary" class="ghost">MISSION SELECT</button></div></div></div><div class="toast" id="toast" aria-live="polite"></div></div>
+        <div class="field-legend"><span><i class="legend-plant"></i> FRIENDLY</span><span><i class="legend-zombie"></i> HOSTILE</span><span><i class="legend-drop">✦</i> SUPPLY DROP <b>· CLICK TO COLLECT</b></span><span class="keyboard-hint">KEYS <kbd>1</kbd>—<kbd>6</kbd> SELECT <kbd>SPACE</kbd> PAUSE <kbd>M</kbd> MISSIONS</span></div>
       </section>
     </section>
     <footer class="bottomline"><span>FIELD NOTES <b>·</b> KEEP YOUR UNITS PROTECTED</span><span>EST. 1944 <b>✳</b> GROWN TO DEFEND</span></footer>

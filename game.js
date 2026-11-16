@@ -1,44 +1,250 @@
 (() => {
   const canvas = document.getElementById('battlefield');
   const ctx = canvas.getContext('2d');
-  const W = 1000, H = 590, COLS = 9, ROWS = 5;
+  const W = 1000, H = 590, COLS = 9;
   const board = { x: 65, y: 66, w: 890, h: 470 };
-  const cw = board.w / COLS, rh = board.h / ROWS;
+  const cw = board.w / COLS;
+  let ROWS = 5, rh = board.h / ROWS;
+  const SAVE_KEY = 'frontline-campaign-v1';
+
   const defs = [
-    {id:'pea',name:'Rifle Pea',desc:'FRONTLINE',icon:'🌱',cost:100,hp:100,rate:1.55,damage:24,color:'#74ad4d',kind:'shooter',tip:'Rapid fire'},
-    {id:'sun',name:'Supply Bloom',desc:'SUPPORT',icon:'🌻',cost:50,hp:85,rate:8,kind:'sun',tip:'Makes sun'},
-    {id:'wall',name:'Bunker Bulb',desc:'BARRICADE',icon:'🥔',cost:75,hp:560,kind:'wall',tip:'Heavy armor'},
-    {id:'ice',name:'Frost Scout',desc:'SLOW FIRE',icon:'🫛',cost:175,hp:100,rate:2.1,damage:20,color:'#62b5b1',kind:'ice',tip:'Slows foes'},
-    {id:'bomb',name:'Cherry Mortar',desc:'EXPLOSIVE',icon:'🍒',cost:150,hp:1,kind:'bomb',tip:'Area blast'},
-    {id:'mine',name:'Tripwire Mine',desc:'AMBUSH',icon:'🪨',cost:50,hp:75,kind:'mine',tip:'Hidden trap'}
+    {id:'pea',name:'Rifle Pea',desc:'FRONTLINE',icon:'🌱',cost:100,hp:100,rate:1.55,damage:24,color:'#74ad4d',kind:'shooter',tip:'Rapid fire',unlockLevel:1},
+    {id:'sun',name:'Supply Bloom',desc:'SUPPORT',icon:'🌻',cost:50,hp:85,rate:8,kind:'sun',tip:'Makes sun',unlockLevel:1},
+    {id:'wall',name:'Bunker Bulb',desc:'BARRICADE',icon:'🥔',cost:75,hp:560,kind:'wall',tip:'Heavy armor',unlockLevel:2},
+    {id:'mine',name:'Tripwire Mine',desc:'AMBUSH',icon:'🪨',cost:50,hp:75,kind:'mine',tip:'Hidden trap',unlockLevel:3},
+    {id:'ice',name:'Frost Scout',desc:'SLOW FIRE',icon:'🫛',cost:175,hp:100,rate:2.1,damage:20,color:'#62b5b1',kind:'ice',tip:'Slows foes',unlockLevel:4},
+    {id:'bomb',name:'Cherry Mortar',desc:'EXPLOSIVE',icon:'🍒',cost:150,hp:1,kind:'bomb',tip:'Area blast',unlockLevel:5}
   ];
-  let sun = 150, selected = 'pea', plants = [], zombies = [], shots = [], drops = [], particles = [];
-  let running = true, ended = false, won = false, last = performance.now(), elapsed = 0, spawnTimer = 8, naturalDropTimer = 5;
-  let wave = 1, spawned = 0, killed = 0, waveSpawned = 0, waveDefeated = 0, waveGap = 0;
-  let mowers = Array.from({length:ROWS}, (_, row) => ({row, ready:true, x:board.x - 24, active:false}));
-  let toastTimer = 0, soundOn = false;
+
+  const LEVELS = [
+    {n:1,name:'FIRST CONTACT',sector:'THE OLD HOMESTEAD',sub:'SECTOR 07',
+      brief:'A handful of stragglers are testing the east fence. Plant your first line and hold the lawn.',
+      lanes:3,sun:175,theme:'day',firstSpawn:7,earlyZombie:true,
+      opening:[{id:'sun',row:1,col:1},{id:'pea',row:1,col:3}],
+      waves:[
+        {name:'STRAYS',count:4,elite:0,hp:1,speed:1,gap:[7,9]},
+        {name:'SCOUTING PARTY',count:6,elite:.06,hp:1.1,speed:1.05,gap:[6,8]}
+      ]},
+    {n:2,name:'DIG IN',sector:'THE EAST RIDGE',sub:'SECTOR 12',
+      brief:'They are coming in numbers now. Sandbag the lanes with a Bunker Bulb and make your stand.',
+      lanes:4,sun:150,theme:'overcast',firstSpawn:8,
+      opening:[{id:'sun',row:1,col:1},{id:'pea',row:2,col:3}],
+      waves:[
+        {name:'FIRST PUSH',count:5,elite:.05,hp:1,speed:1,gap:[6.5,8.5]},
+        {name:'PRESSURE',count:7,elite:.12,hp:1.1,speed:1.05,gap:[5.5,7.5]},
+        {name:'REINFORCEMENTS',count:8,elite:.18,hp:1.2,speed:1.1,gap:[4.8,6.8]}
+      ]},
+    {n:3,name:"NO MAN'S LAWN",sector:'THE WHEAT TRENCH',sub:'SECTOR 21',
+      brief:'Open ground, no cover. Tripwire Mines turn every approach lane into a killing field.',
+      lanes:5,sun:150,theme:'dusk',firstSpawn:8,
+      opening:[{id:'sun',row:2,col:1},{id:'pea',row:2,col:3}],
+      waves:[
+        {name:'PROBING RAID',count:6,elite:.08,hp:1,speed:1.05,gap:[6,8]},
+        {name:'TRENCH RUSH',count:8,elite:.15,hp:1.15,speed:1.1,gap:[5,7]},
+        {name:'NIGHT PATROL',count:10,elite:.2,hp:1.25,speed:1.12,gap:[4.5,6.5]}
+      ]},
+    {n:4,name:'COLD FRONT',sector:'THE FROZEN ORCHARD',sub:'SECTOR 34',
+      brief:'A freezing rain rolls in. Frost Scouts slow the horde — use every second they give you.',
+      lanes:5,sun:175,theme:'cold',firstSpawn:8,
+      opening:[{id:'sun',row:2,col:1},{id:'pea',row:2,col:3}],
+      waves:[
+        {name:'COLD SNAP',count:7,elite:.12,hp:1.1,speed:1.08,gap:[5.5,7.5]},
+        {name:'WHITEOUT',count:9,elite:.18,hp:1.25,speed:1.12,gap:[4.8,6.8]},
+        {name:'REINFORCED HORDE',count:11,elite:.24,hp:1.35,speed:1.15,gap:[4.2,6]}
+      ]},
+    {n:5,name:'SIEGE AT DUSK',sector:'THE BURNED FIELDS',sub:'SECTOR 41',
+      brief:'Heavy units are massing beyond the fence. Cherry Mortars are your answer — use them well.',
+      lanes:5,sun:200,theme:'night',firstSpawn:9,
+      opening:[{id:'sun',row:2,col:1},{id:'wall',row:2,col:5}],
+      waves:[
+        {name:'ARMORED PROBE',count:8,elite:.18,hp:1.2,speed:1.1,gap:[5,7]},
+        {name:'HEAVY PUSH',count:10,elite:.24,hp:1.35,speed:1.15,gap:[4.5,6.5]},
+        {name:'SIEGE COLUMN',count:12,elite:.3,hp:1.45,speed:1.2,gap:[3.8,5.8]}
+      ]},
+    {n:6,name:'LAST STAND',sector:'THE OLD HOMESTEAD',sub:'SECTOR 00 · FINAL',
+      brief:'Every unit you have, every lane at once. The garden either holds tonight or it falls.',
+      lanes:5,sun:175,theme:'storm',firstSpawn:8,
+      opening:[{id:'sun',row:2,col:1},{id:'pea',row:2,col:3}],
+      waves:[
+        {name:'THE HORDE',count:9,elite:.22,hp:1.3,speed:1.15,gap:[4.6,6.4]},
+        {name:'THE SURGE',count:11,elite:.3,hp:1.45,speed:1.2,gap:[4,5.8]},
+        {name:'FINAL ASSAULT',count:14,elite:.38,hp:1.6,speed:1.25,gap:[3.4,5.2]}
+      ]}
+  ];
+
+  const THEMES = {
+    day:{sky:['#e7e1ca','#c7c4a4'],tint:null,rain:0,glow:false},
+    overcast:{sky:['#dfe0d5','#bfc3b6'],tint:'rgba(96,112,116,.10)',rain:0,glow:false},
+    dusk:{sky:['#efcfaa','#c9a07b'],tint:'rgba(198,118,58,.16)',rain:0,glow:false},
+    cold:{sky:['#d3dfe0','#aebfc2'],tint:'rgba(86,124,148,.17)',rain:.55,glow:false},
+    night:{sky:['#5a6a7e','#3a4858'],tint:'rgba(18,30,54,.30)',rain:0,glow:true},
+    storm:{sky:['#6a6673','#4a4653'],tint:'rgba(26,24,38,.34)',rain:1,glow:true}
+  };
 
   const $ = id => document.getElementById(id);
-  function unitMarkup(p, i) { return `<button class="unit-card ${p.id===selected?'selected':''}" data-id="${p.id}" aria-label="${p.name}, costs ${p.cost} sun"><span class="unit-art">${p.icon}</span><span class="unit-name">${p.name}</span><span class="unit-detail">${p.desc}</span><span class="unit-cost">✦ ${p.cost}</span></button>`; }
-  function renderUnits() {
-    $('unitList').innerHTML = defs.map(unitMarkup).join('');
-    document.querySelectorAll('.unit-card').forEach(el => el.addEventListener('click', () => { selected = el.dataset.id; renderUnits(); }));
-    updateSupply();
+
+  function loadProgress(){
+    try{
+      const raw=localStorage.getItem(SAVE_KEY);
+      if(raw){
+        const p=JSON.parse(raw);
+        if(p&&typeof p==='object'&&p.stars&&typeof p.stars==='object'){
+          return {unlocked:Math.min(LEVELS.length,Math.max(1,Number(p.unlocked)||1)),stars:p.stars};
+        }
+      }
+    }catch(e){}
+    return {unlocked:1,stars:{}};
   }
-  function updateSupply() {
-    $('sunCount').textContent = sun;
-    document.querySelectorAll('.unit-card').forEach(el => el.classList.toggle('unaffordable', sun < defs.find(p=>p.id===el.dataset.id).cost));
-    $('plantCount').textContent = `${plants.length} ${plants.length===1?'UNIT':'UNITS'}`;
-  }
-  function announce(msg) { const el=$('toast'); el.textContent=msg; el.classList.add('show'); toastTimer=2.2; }
-  function roundedRect(x,y,w,h,r,fill,stroke) { ctx.beginPath(); ctx.roundRect(x,y,w,h,r); if(fill){ctx.fillStyle=fill;ctx.fill()} if(stroke){ctx.strokeStyle=stroke;ctx.stroke()} }
-  function ellipse(x,y,rx,ry,fill) { ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill(); }
-  function line(x1,y1,x2,y2,color,width=1) { ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke(); }
+  function saveProgress(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(progress));}catch(e){}}
+
+  let progress=loadProgress();
+  let levelIndex=0, level=LEVELS[0];
+  let sun=150, selected='pea', plants=[], zombies=[], shots=[], drops=[], particles=[];
+  let running=true, ended=false, won=false, menuOpen=true, last=performance.now(), elapsed=0, spawnTimer=7, naturalDropTimer=4;
+  let wave=1, spawned=0, killed=0, waveSpawned=0, waveDefeated=0;
+  let mowers=Array.from({length:ROWS},(_,row)=>({row,ready:true,x:board.x-24,active:false}));
+  let toastTimer=0, soundOn=false, overlayAction=null;
+
+  const levelRoster = () => defs.filter(d=>d.unlockLevel<=level.n);
+  const totalStars = () => Object.values(progress.stars).reduce((a,b)=>a+(b||0),0);
+  function starRow(n){return [0,1,2].map(i=>`<i class="${i<n?'on':''}">★</i>`).join('');}
+  function titleMarkup(name){const words=name.split(' ');const last=words.pop();return `${words.join(' ')} <em>${last}</em>`;}
+
+  function announce(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');toastTimer=2.2;}
+  function roundedRect(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.stroke()}}
+  function ellipse(x,y,rx,ry,fill){ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();}
+  function line(x1,y1,x2,y2,color,width=1){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();}
   function rand(a,b){return a+Math.random()*(b-a)}
   function cellCenter(row,col){return {x:board.x+col*cw+cw/2,y:board.y+row*rh+rh/2};}
 
+  /* ---------- HUD ---------- */
+  function unitMarkup(p){
+    if(p.unlockLevel>level.n){
+      return `<button class="unit-card locked" disabled aria-label="${p.name}, locked until level ${p.unlockLevel}"><span class="unit-art">🔒</span><span class="unit-name">${p.name}</span><span class="unit-detail">NOT ISSUED</span><span class="unit-cost">LV 0${p.unlockLevel}</span></button>`;
+    }
+    return `<button class="unit-card ${p.id===selected?'selected':''}" data-id="${p.id}" aria-label="${p.name}, costs ${p.cost} sun"><span class="unit-art">${p.icon}</span><span class="unit-name">${p.name}</span><span class="unit-detail">${p.desc}</span><span class="unit-cost">✦ ${p.cost}</span></button>`;
+  }
+  function renderUnits(){
+    $('unitList').innerHTML=defs.map(unitMarkup).join('');
+    document.querySelectorAll('.unit-card[data-id]').forEach(el=>el.addEventListener('click',()=>{selected=el.dataset.id;renderUnits();}));
+    updateSupply();
+  }
+  function updateSupply(){
+    $('sunCount').textContent=sun;
+    document.querySelectorAll('.unit-card[data-id]').forEach(el=>{const d=defs.find(p=>p.id===el.dataset.id);el.classList.toggle('unaffordable',sun<d.cost);});
+    $('plantCount').textContent=`${plants.length} ${plants.length===1?'UNIT':'UNITS'}`;
+  }
+  function renderLevelUI(){
+    $('missionTag').innerHTML=`<i></i> OPERATION: GREEN THUMB <span>•</span> LEVEL 0${level.n}`;
+    $('panelLevel').textContent=`0${level.n}`;
+    $('introEyebrow').textContent=`${level.sector} · ${level.sub}`;
+    $('introTitle').innerHTML=titleMarkup(level.name);
+    $('introSub').textContent=level.brief;
+    $('sectorName').textContent=level.sector;
+    $('sectorSub').textContent=`${level.sub} · ${level.name}`;
+    $('intelWaves').textContent=`${level.waves.length} WAVES`;
+    $('intelLanes').textContent=level.lanes;
+    $('intelMowers').textContent=level.lanes;
+    $('intelFoes').textContent=level.waves.reduce((a,w)=>a+w.count,0);
+    updateCampaignChip();
+  }
+  function updateCampaignChip(){
+    $('campaignChip').innerHTML=`<i></i> CAMPAIGN ★ ${totalStars()} / ${LEVELS.length*3}`;
+  }
+  function updateWaveUI(){
+    const conf=level.waves[Math.min(wave-1,level.waves.length-1)];
+    $('waveEyebrow').textContent=`LEVEL 0${level.n} · WAVE ${wave} OF ${level.waves.length}`;
+    $('waveLabel').innerHTML=`WAVE 0${wave} <span>—</span> ${conf.name}`;
+    $('waveCount').textContent=`${waveDefeated} / ${conf.count} HOSTILES`;
+    $('waveProgress').style.width=`${Math.min(100,waveDefeated/conf.count*100)}%`;
+  }
+
+  /* ---------- MISSION SELECT ---------- */
+  function renderMissions(){
+    $('msSectors').textContent=`${Object.keys(progress.stars).length} / ${LEVELS.length}`;
+    $('msStars').textContent=`${totalStars()} / ${LEVELS.length*3}`;
+    $('msUnits').textContent=`${defs.filter(d=>d.unlockLevel<=progress.unlocked).length} / ${defs.length}`;
+    $('seedBank').innerHTML=defs.map(d=>{
+      const issued=d.unlockLevel<=progress.unlocked;
+      return `<div class="sb-unit${issued?'':' locked'}"><i>${issued?d.icon:'🔒'}</i><div><b>${d.name}</b><small>${issued?'ISSUED':'LOCKED · LV 0'+d.unlockLevel}</small></div></div>`;
+    }).join('');
+    $('missionGrid').innerHTML=LEVELS.map((lv,i)=>{
+      const unlocked=lv.n<=progress.unlocked;
+      const cleared=(progress.stars[lv.n]||0)>0;
+      const isNext=lv.n===progress.unlocked&&!cleared;
+      const newUnit=defs.find(d=>d.unlockLevel===lv.n);
+      const roster=defs.filter(d=>d.unlockLevel<=lv.n);
+      const cls=['mission-card'];
+      if(!unlocked)cls.push('locked');
+      if(cleared)cls.push('cleared');
+      if(isNext)cls.push('next');
+      const status=!unlocked?'LOCKED':cleared?'SECURED':isNext?'READY':'OPEN';
+      let reward;
+      if(!unlocked)reward=`<span class="mc-reward lockline">🔒 SECURE LEVEL 0${lv.n-1} TO OPEN</span>`;
+      else if(lv.n===1)reward='<span class="mc-reward"><b>STANDARD ISSUE</b> 2 UNITS</span>';
+      else if(newUnit)reward=`<span class="mc-reward"><b>NEW ISSUE</b> ${newUnit.icon} ${newUnit.name}</span>`;
+      else reward=`<span class="mc-reward"><b>FULL ARSENAL</b> · ${roster.length} UNITS</span>`;
+      return `<button class="${cls.join(' ')}" data-level="${i}" ${unlocked?'':'disabled'}>
+        <span class="mc-top"><span class="mc-num">0${lv.n}</span><span class="mc-status">${status}</span></span>
+        <span class="mc-name">${lv.name}</span>
+        <span class="mc-sector">${lv.sector} · ${lv.lanes} LANES · ${lv.waves.length} WAVES</span>
+        <span class="mc-units">${roster.map(d=>`<i title="${d.name}">${d.icon}</i>`).join('')}</span>
+        ${reward}
+        <span class="mc-stars">${cleared?starRow(progress.stars[lv.n]):unlocked?starRow(0):'<i>☆</i><i>☆</i><i>☆</i>'}</span>
+      </button>`;
+    }).join('');
+    document.querySelectorAll('.mission-card[data-level]:not([disabled])').forEach(el=>{
+      el.addEventListener('click',()=>{startLevel(+el.dataset.level);});
+    });
+  }
+  function openMissions(){menuOpen=true;renderMissions();$('missionScreen').hidden=false;}
+  function closeMissions(){menuOpen=false;$('missionScreen').hidden=true;}
+
+  /* ---------- LEVEL FLOW ---------- */
+  function startLevel(idx,opts={}){
+    levelIndex=Math.max(0,Math.min(LEVELS.length-1,idx));
+    level=LEVELS[levelIndex];
+    ROWS=level.lanes;rh=board.h/ROWS;
+    sun=level.sun;plants=[];zombies=[];shots=[];drops=[];particles=[];
+    running=true;ended=false;won=false;elapsed=0;spawnTimer=level.firstSpawn;naturalDropTimer=4;
+    wave=1;spawned=0;killed=0;waveSpawned=0;waveDefeated=0;
+    mowers=Array.from({length:ROWS},(_,row)=>({row,ready:true,x:board.x-24,active:false}));
+    menuOpen=false;
+    selected=levelRoster()[0].id;
+    level.opening.forEach(o=>{
+      const def=defs.find(d=>d.id===o.id),row=Math.min(o.row,ROWS-1),pos=cellCenter(row,o.col);
+      plants.push({...def,row,col:o.col,x:pos.x,y:pos.y,hp:def.hp,maxHp:def.hp,cool:def.kind==='sun'?3.2:rand(.4,.9),armed:false,arm:1.5});
+    });
+    if(level.earlyZombie){
+      const conf=level.waves[0];
+      const opener=level.opening.find(o=>o.id==='pea');
+      const row=opener?Math.min(opener.row,ROWS-1):Math.min(2,ROWS-1);
+      const maxHp=Math.round((108+levelIndex*18)*conf.hp);
+      zombies.push({x:board.x+board.w-55,y:board.y+row*rh+rh/2-2,row,hp:maxHp,maxHp,speed:12,speedBase:12,bite:0,slow:0,phase:2,elite:false});
+      waveSpawned=1;spawned=1;
+    }
+    $('fieldOverlay').hidden=true;
+    $('missionScreen').hidden=true;
+    $('battleStatus').textContent='ENGAGEMENT IN PROGRESS';
+    $('pauseBtn').innerHTML='Ⅱ <span>PAUSE</span>';
+    renderLevelUI();renderUnits();updateWaveUI();updateSupply();renderMissions();
+    if(!opts.silent)announce(`LEVEL 0${level.n} — ${level.name}. Hold ${level.lanes} lanes.`);
+  }
+  function reset(){startLevel(levelIndex);}
+  function togglePause(){
+    if(ended||menuOpen)return;
+    running=!running;
+    $('pauseBtn').innerHTML=running?'Ⅱ <span>PAUSE</span>':'▶ <span>RESUME</span>';
+    $('battleStatus').textContent=running?'ENGAGEMENT IN PROGRESS':'FIELD OPERATIONS PAUSED';
+    if(!running)announce('Operations paused.');
+  }
+
+  /* ---------- FIELD ART ---------- */
+  const theme=()=>THEMES[level.theme]||THEMES.day;
+
   function drawField() {
-    const bg=ctx.createLinearGradient(0,0,0,H); bg.addColorStop(0,'#e7e1ca');bg.addColorStop(1,'#c7c4a4');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+    const t=theme();
+    const bg=ctx.createLinearGradient(0,0,0,H); bg.addColorStop(0,t.sky[0]);bg.addColorStop(1,t.sky[1]);ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
     // distant hills and a hand-built, quiet homestead skyline
     ellipse(790,83,195,59,'#a4ad7e');ellipse(970,91,165,52,'#929f70');ellipse(580,87,180,49,'#b3b58a');
     ctx.fillStyle='#758464';ctx.fillRect(0,131,W,27);
@@ -47,8 +253,9 @@
     ctx.fillStyle='#635e48';ctx.fillRect(806,87,38,47);ctx.fillStyle='#494b3c';ctx.beginPath();ctx.moveTo(798,89);ctx.lineTo(825,68);ctx.lineTo(852,89);ctx.fill();ctx.fillStyle='#dbd1ac';ctx.fillRect(819,104,11,15);
     // earth pad and grass rows
     roundedRect(board.x-7,board.y-7,board.w+14,board.h+14,12,'#586747','#e8e4d0');
+    const tones=['#91a968','#9caf72','#8fa765','#a1b477','#91a666'];
     for(let r=0;r<ROWS;r++){
-      const y=board.y+r*rh; const tone=['#91a968','#9caf72','#8fa765','#a1b477','#91a666'][r];
+      const y=board.y+r*rh; const tone=tones[r%tones.length];
       ctx.fillStyle=tone;ctx.fillRect(board.x,y,board.w,rh);
       ctx.fillStyle='rgba(233,231,184,.12)';ctx.fillRect(board.x,y,board.w,7);
       // lane track, subtle tire rut and scattered grass strokes
@@ -58,6 +265,7 @@
       if(r%2===0){ellipse(board.x+42,y+rh-18,2,1.3,'#d7c798');ellipse(board.x+board.w-42,y+15,2,1,'#ddcea1');}
     }
     // tile boundaries and selected hover
+    for(let c=0;c<COLS;c++){if(c%2===0){ctx.fillStyle='rgba(250,250,220,.04)';ctx.fillRect(board.x+c*cw,board.y,cw,board.h);}}
     ctx.lineWidth=1;
     for(let c=0;c<=COLS;c++){const x=board.x+c*cw;line(x,board.y,x,board.y+board.h,'rgba(49,72,48,.20)',1);}
     for(let r=0;r<=ROWS;r++){const y=board.y+r*rh;line(board.x,y,board.x+board.w,y,'rgba(49,72,48,.23)',1);}
@@ -74,10 +282,10 @@
     }
     ctx.textAlign='left';
     // corner wayfinding
-    ctx.fillStyle='rgba(42,57,38,.68)';ctx.font='800 8px "DM Sans"';ctx.fillText('N  ↑',board.x+8,board.y-18);
+    ctx.fillStyle=t.glow?'rgba(226,236,210,.62)':'rgba(42,57,38,.68)';ctx.font='800 8px "DM Sans"';ctx.fillText('N  ↑',board.x+8,board.y-18);
     ctx.textAlign='right';ctx.fillText('DEFENSE LINE',board.x+board.w,board.y-18);ctx.textAlign='left';
     // live highlight for plant placement
-    if(pointer.inside && running && !ended){const {row,col}=pointer;const x=board.x+col*cw,y=board.y+row*rh;ctx.fillStyle='rgba(232,246,188,.22)';ctx.fillRect(x+2,y+2,cw-4,rh-4);ctx.strokeStyle='rgba(244,255,215,.75)';ctx.lineWidth=2;ctx.strokeRect(x+2,y+2,cw-4,rh-4);}
+    if(pointer.inside && running && !ended && !menuOpen){const {row,col}=pointer;const x=board.x+col*cw,y=board.y+row*rh;ctx.fillStyle='rgba(232,246,188,.22)';ctx.fillRect(x+2,y+2,cw-4,rh-4);ctx.strokeStyle='rgba(244,255,215,.75)';ctx.lineWidth=2;ctx.strokeRect(x+2,y+2,cw-4,rh-4);}
   }
 
   function drawPlant(p) {
@@ -162,20 +370,52 @@
     ellipse(x,y+17,13,4,'#453f2a35');
   }
 
+  function drawWeather(t){
+    if(!t.rain)return;
+    const n=Math.round(52*t.rain);
+    ctx.strokeStyle=`rgba(206,226,232,${0.2*t.rain})`;
+    ctx.lineWidth=1.2;
+    for(let i=0;i<n;i++){
+      const sx=(i*173.3)%W, speed=520+(i%5)*70;
+      const x=((sx-elapsed*90)%W+W)%W;
+      const y=(i*97.7+elapsed*speed)%H;
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-6,y+20);ctx.stroke();
+    }
+  }
+  function drawGlow(t){
+    if(!t.glow)return;
+    const cy=board.y+board.h/2;
+    const g=ctx.createRadialGradient(board.x+18,cy,14,board.x+18,cy,board.h*.8);
+    g.addColorStop(0,'rgba(255,212,146,.20)');
+    g.addColorStop(.45,'rgba(255,212,146,.07)');
+    g.addColorStop(1,'rgba(255,212,146,0)');
+    ctx.fillStyle=g;
+    ctx.fillRect(board.x-40,board.y-30,board.w*.5,board.h+60);
+  }
+
   function draw() {
     ctx.clearRect(0,0,W,H);drawField();
     // artful decorative sandbags outside the lawn
     for(let i=0;i<4;i++){const x=board.x+105+i*205;roundedRect(x,board.y+board.h+13,43,9,4,'#bba982','#90876a');line(x+22,board.y+board.h+14,x+22,board.y+board.h+20,'#918567',1);}
-    plants.forEach(drawPlant);drops.forEach(drawDrop);shots.forEach(s=>{ellipse(s.x,s.y,6,5,s.ice?'#c3f1db':'#b4d65d');ellipse(s.x-1,s.y-1,2,1.7,'#f1f3a5');});
-    zombies.forEach(drawZombie);
+    const unitScale=Math.min(1.28,Math.max(1,rh/100));
+    const scaleAt=f=>{ctx.save();ctx.translate(f.x,f.y);ctx.scale(unitScale,unitScale);ctx.translate(-f.x,-f.y);};
+    plants.forEach(p=>{scaleAt(p);drawPlant(p);ctx.restore();});
+    drops.forEach(d=>{scaleAt(d);drawDrop(d);ctx.restore();});
+    shots.forEach(s=>{ellipse(s.x,s.y,6,5,s.ice?'#c3f1db':'#b4d65d');ellipse(s.x-1,s.y-1,2,1.7,'#f1f3a5');});
+    zombies.forEach(z=>{scaleAt(z);drawZombie(z);ctx.restore();});
     particles.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life/p.max);ctx.fillStyle=p.color;ellipse(p.x,p.y,p.r,p.r);ctx.globalAlpha=1;});
     mowers.forEach(m=>{if(m.active){ctx.save();ctx.translate(m.x,board.y+m.row*rh+rh/2);ctx.rotate(-.1);roundedRect(-14,-14,31,28,5,'#d5d0b6','#343c31');roundedRect(-9,-10,20,19,3,'#89955c');ellipse(11,0,6,6,'#e8e0c3');ctx.restore();}});
+    const t=theme();
+    if(t.tint){ctx.fillStyle=t.tint;ctx.fillRect(0,0,W,H);}
+    drawGlow(t);drawWeather(t);
   }
 
+  /* ---------- GAMEPLAY ---------- */
   function plantAt(row,col,id) {
-    if(!running||ended)return;
+    if(!running||ended||menuOpen)return;
     if(plants.some(p=>p.row===row&&p.col===col)){announce('That tile is already occupied.');return;}
     const def=defs.find(p=>p.id===id);
+    if(!def||def.unlockLevel>level.n){announce('That unit is not issued for this mission.');return;}
     if(sun<def.cost){announce('Not enough sun supplies. Collect a drop!');return;}
     const {x,y}=cellCenter(row,col);sun-=def.cost;
     const p={...def,row,col,x,y,hp:def.hp,maxHp:def.hp,cool:rand(.2,.8),armed:false,arm:1.5};
@@ -187,43 +427,48 @@
     } else announce(`${def.name} deployed.`);
   }
   function burst(x,y,color,n=8){for(let i=0;i<n;i++){let a=rand(0,Math.PI*2),v=rand(25,115);particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-20,life:rand(.3,.75),max:.75,r:rand(2,5),color});}}
-  function spawnZombie() {
-    if(wave>3)return;
-    const row=Math.floor(Math.random()*ROWS), elite=wave>=2&&Math.random()<.30;
-    const maxHp=elite?170+(wave-1)*25:105+(wave-1)*22;
-    zombies.push({x:board.x+board.w+rand(20,65),y:board.y+row*rh+rh/2-2,row,hp:maxHp,maxHp,speed:elite?rand(8,12):rand(12,17),bite:0,slow:0,phase:rand(0,6),elite});
+  function spawnZombie(conf) {
+    const row=Math.floor(Math.random()*ROWS), elite=Math.random()<conf.elite;
+    const maxHp=Math.round(((elite?185:108)+levelIndex*18)*conf.hp);
+    const speed=(elite?rand(9,12.5):rand(12.5,17))*(conf.speed||1);
+    zombies.push({x:board.x+board.w+rand(20,65),y:board.y+row*rh+rh/2-2,row,hp:maxHp,maxHp,speed,speedBase:speed,bite:0,slow:0,phase:rand(0,6),elite});
     waveSpawned++;spawned++;updateWaveUI();
   }
   function makeDrop(x,y,box=false){drops.push({x,y,box,phase:rand(0,6),life:box?12:9});}
-  function updateWaveUI(){
-    const names=['SCOUTING PARTY','REINFORCEMENTS','FINAL ASSAULT'];
-    $('waveLabel').innerHTML=`WAVE 0${Math.min(wave,3)} <span>—</span> ${names[Math.min(wave-1,2)]}`;
-    $('waveCount').textContent=`${waveDefeated} / ${[8,10,12][Math.min(wave-1,2)]} HOSTILES`;
-    $('waveProgress').style.width=`${Math.min(100,waveDefeated/[8,10,12][Math.min(wave-1,2)]*100)}%`;
-  }
+
   function update(dt) {
     if(toastTimer>0){toastTimer-=dt;if(toastTimer<=0)$('toast').classList.remove('show');}
-    if(!running||ended)return;
+    if(menuOpen||!running||ended)return;
     elapsed+=dt;spawnTimer-=dt;naturalDropTimer-=dt;
+    const conf=level.waves[Math.min(wave-1,level.waves.length-1)];
     if(spawnTimer<=0){
-      const target=[8,10,12][wave-1];
-      if(waveSpawned<target){spawnZombie();spawnTimer=wave===1?rand(5.3,7.1):rand(3.7,5.3);}
+      if(waveSpawned<conf.count){spawnZombie(conf);spawnTimer=rand(conf.gap[0],conf.gap[1]);}
       else if(zombies.length===0){
-        if(wave<3){wave++;waveSpawned=0;waveDefeated=0;waveGap=2.5;spawnTimer=waveGap;updateWaveUI();announce(`Wave ${wave} approaching. Reinforce the line!`);}
-        else finish(true);
-      } else spawnTimer=1.5;
+        if(wave<level.waves.length){
+          wave++;waveSpawned=0;waveDefeated=0;spawnTimer=2.6;updateWaveUI();
+          announce(`Wave ${wave} — ${level.waves[wave-1].name}. Hold the line!`);
+        } else { finish(true); return; }
+      } else spawnTimer=1.2;
     }
     if(naturalDropTimer<=0){makeDrop(rand(board.x+35,board.x+board.w-35),rand(board.y+25,board.y+board.h-25),Math.random()<.3);naturalDropTimer=rand(7,11);}
+    let spentMines=null;
     plants.forEach(p=>{
       if(p.kind==='sun'){p.cool-=dt;if(p.cool<=0){makeDrop(p.x+rand(-9,9),p.y-25,false);p.cool=rand(8,10);}}
-      if(p.kind==='mine'){if(!p.armed){p.arm-=dt;if(p.arm<=0)p.armed=true;}else{const victim=zombies.find(z=>z.row===p.row&&z.x>p.x-8&&z.x<p.x+48);if(victim){victim.hp-=115;burst(p.x,p.y,'#d0b96f',10);plants=plants.filter(q=>q!==p);}}}
-      if(p.kind==='pea'||p.kind==='ice'){
+      if(p.kind==='mine'){
+        if(!p.armed){p.arm-=dt;if(p.arm<=0)p.armed=true;}
+        else{
+          const victim=zombies.find(z=>z.row===p.row&&z.x>p.x-8&&z.x<p.x+48);
+          if(victim){victim.hp-=115;burst(p.x,p.y,'#d0b96f',10);(spentMines||(spentMines=[])).push(p);}
+        }
+      }
+      if(p.kind==='shooter'||p.kind==='ice'){
         p.cool-=dt;
         if(p.cool<=0&&zombies.some(z=>z.row===p.row&&z.x>p.x)){
           shots.push({x:p.x+19,y:p.y-5,row:p.row,vx:260,damage:p.damage,ice:p.kind==='ice'});p.cool=p.rate;
         }
       }
     });
+    if(spentMines)plants=plants.filter(p=>!spentMines.includes(p));
     shots.forEach(s=>{
       s.x+=s.vx*dt;
       const target=zombies.find(z=>z.row===s.row&&Math.abs(z.x-s.x)<15);
@@ -237,6 +482,7 @@
       else z.x-=z.speed*(z.slow>0?.48:1)*dt;
       if(z.x<board.x-30){const mower=mowers[z.row];if(mower.ready){mower.ready=false;mower.active=true;mower.x=board.x-20;announce('TRIPWIRE MOWER! Lane cleared.');}else finish(false);}
     });
+    if(ended)return;
     mowers.forEach(m=>{if(m.active){m.x+=310*dt;zombies=zombies.filter(z=>{if(z.row===m.row&&z.x<m.x+34){burst(z.x,z.y,'#a4bc79',5);waveDefeated++;killed++;return false;}return true;});if(m.x>board.x+board.w+35)m.active=false;}});
     const before=zombies.length;zombies=zombies.filter(z=>{if(z.hp<=0){burst(z.x,z.y,'#9b9d70',9);waveDefeated++;killed++;if(Math.random()<.22)makeDrop(z.x,z.y-12,true);return false;}return true;});
     if(before!==zombies.length)updateWaveUI();
@@ -244,29 +490,92 @@
     particles.forEach(p=>{p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=130*dt;p.vx*=.98;});particles=particles.filter(p=>p.life>0);
     updateSupply();
   }
-  function finish(victory){ended=true;running=false;won=victory;$('battleStatus').textContent=victory?'SECTOR SECURED':'DEFENSES BREACHED';$('overlayTitle').textContent=victory?'SECTOR SECURED':'LINE BREACHED';$('overlayText').textContent=victory?`All three waves repelled. ${killed} hostiles neutralized. The garden holds.`:'The hostiles crossed the defense line. Regroup and try a new strategy.';$('fieldOverlay').hidden=false;}
-  function reset(){sun=150;selected='pea';plants=[];zombies=[];shots=[];drops=[];particles=[];running=true;ended=false;won=false;elapsed=0;spawnTimer=8;naturalDropTimer=5;wave=1;spawned=0;killed=0;waveSpawned=0;waveDefeated=0;mowers=Array.from({length:ROWS},(_,row)=>({row,ready:true,x:board.x-24,active:false}));$('fieldOverlay').hidden=true;$('battleStatus').textContent='ENGAGEMENT IN PROGRESS';$('pauseBtn').innerHTML='Ⅱ <span>PAUSE</span>';renderUnits();updateWaveUI();announce('Mission reset. Deploy your defenses.');}
-  function togglePause(){if(ended)return;running=!running;$('pauseBtn').innerHTML=running?'Ⅱ <span>PAUSE</span>':'▶ <span>RESUME</span>';$('battleStatus').textContent=running?'ENGAGEMENT IN PROGRESS':'FIELD OPERATIONS PAUSED';if(!running)announce('Operations paused.');}
 
+  function finish(victory){
+    ended=true;running=false;won=victory;
+    const mowersLeft=mowers.filter(m=>m.ready).length;
+    const stars=victory?(mowersLeft===level.lanes?3:mowersLeft>=level.lanes-1?2:1):0;
+    $('battleStatus').textContent=victory?'SECTOR SECURED':'DEFENSES BREACHED';
+    $('overlayKicker').textContent=`FIELD REPORT · LEVEL 0${level.n}`;
+    $('overlayTitle').textContent=victory?'SECTOR SECURED':'LINE BREACHED';
+    const starBox=$('overlayStars');
+    starBox.hidden=!victory;
+    starBox.innerHTML=starRow(stars);
+    const primary=$('overlayPrimary'), secondary=$('overlaySecondary'), reward=$('overlayReward');
+    if(victory){
+      const best=Math.max(progress.stars[level.n]||0,stars);
+      progress.stars[level.n]=best;
+      const unlockedBefore=progress.unlocked;
+      progress.unlocked=Math.min(LEVELS.length,Math.max(progress.unlocked,level.n+1));
+      saveProgress();updateCampaignChip();
+      const lineState=mowersLeft===level.lanes?'defense line unbroken':`${mowersLeft} of ${level.lanes} lane mowers intact`;
+      $('overlayText').textContent=`${killed} hostiles neutralized · ${lineState}.`;
+      const next=LEVELS[level.n];
+      reward.hidden=false;
+      if(next){
+        const newUnit=defs.find(d=>d.unlockLevel===next.n);
+        reward.innerHTML=`<small>NEXT ASSIGNMENT · LEVEL 0${next.n}</small><b>${next.name} — ${next.sector}</b>${newUnit?`<small>NEW UNIT ISSUED · ${newUnit.icon} ${newUnit.name.toUpperCase()}</small>`:`<small>FULL ARSENAL IN THE FIELD</small>`}`;
+        primary.innerHTML='NEXT MISSION <span>→</span>';
+        overlayAction=()=>startLevel(levelIndex+1);
+        secondary.hidden=false;secondary.textContent='MISSION SELECT';
+      }else{
+        reward.innerHTML=`<small>CAMPAIGN COMPLETE</small><b>ALL SECTORS SECURED · ${totalStars()} / ${LEVELS.length*3} STARS</b>`;
+        primary.innerHTML='MISSION SELECT <span>→</span>';
+        overlayAction=openMissions;
+        secondary.hidden=true;
+      }
+      if(progress.unlocked>unlockedBefore)renderMissions();
+    }else{
+      starBox.innerHTML='';
+      $('overlayText').textContent='The hostiles crossed the defense line. Regroup, rework your loadout, and try a new strategy.';
+      reward.hidden=true;
+      primary.innerHTML='RETRY MISSION <span>→</span>';
+      overlayAction=()=>startLevel(levelIndex);
+      secondary.hidden=false;secondary.textContent='MISSION SELECT';
+    }
+    renderMissions();
+    $('fieldOverlay').hidden=false;
+  }
+
+  /* ---------- INPUT ---------- */
   const pointer={inside:false,row:0,col:0};
   function getPos(e){const rect=canvas.getBoundingClientRect();return {x:(e.clientX-rect.left)*W/rect.width,y:(e.clientY-rect.top)*H/rect.height};}
   canvas.addEventListener('pointermove',e=>{const p=getPos(e);pointer.col=Math.floor((p.x-board.x)/cw);pointer.row=Math.floor((p.y-board.y)/rh);pointer.inside=p.x>=board.x&&p.x<board.x+board.w&&p.y>=board.y&&p.y<board.y+board.h;});
   canvas.addEventListener('pointerleave',()=>pointer.inside=false);
   canvas.addEventListener('pointerdown',e=>{
+    if(menuOpen)return;
     const p=getPos(e);
     for(let i=drops.length-1;i>=0;i--){const d=drops[i];if(Math.hypot(p.x-d.x,p.y-(d.y+Math.sin(elapsed*3+d.phase)*4))<24){sun+=d.box?50:25;drops.splice(i,1);updateSupply();announce(`+${d.box?50:25} sun supplies collected.`);return;}}
     if(p.x>=board.x&&p.x<board.x+board.w&&p.y>=board.y&&p.y<board.y+board.h)plantAt(Math.floor((p.y-board.y)/rh),Math.floor((p.x-board.x)/cw),selected);
   });
-  $('pauseBtn').addEventListener('click',togglePause);$('restartBtn').addEventListener('click',reset);$('overlayRestart').addEventListener('click',reset);
+
+  $('pauseBtn').addEventListener('click',togglePause);
+  $('restartBtn').addEventListener('click',reset);
+  $('overlayPrimary').addEventListener('click',()=>{if(overlayAction)overlayAction();});
+  $('overlaySecondary').addEventListener('click',openMissions);
+  $('missionsBtn').addEventListener('click',()=>{$('missionScreen').hidden?openMissions():closeMissions();});
+  $('missionsClose').addEventListener('click',closeMissions);
+  $('resetProgress').addEventListener('click',()=>{
+    if(!confirm('Reset the campaign? All sectors, stars and issued units will be erased.'))return;
+    progress={unlocked:1,stars:{}};saveProgress();
+    startLevel(0,{silent:true});
+    menuOpen=true;$('missionScreen').hidden=false;
+    renderMissions();updateCampaignChip();
+    announce('Campaign reset. Level 01 is ready.');
+  });
   $('soundBtn').addEventListener('click',()=>{$('soundBtn').classList.toggle('muted');soundOn=!soundOn;$('soundBtn').title=soundOn?'Sound on':'Sound off';announce(soundOn?'Sound enabled.':'Sound muted.');});
-  document.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();togglePause();}if(e.key>='1'&&e.key<='6'){selected=defs[+e.key-1].id;renderUnits();}if(e.key.toLowerCase()==='r')reset();});
-  let frame=0;function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;update(dt);draw();frame=requestAnimationFrame(loop);}
-  // A small advance team is already dug in when the operation begins.
-  const openingPea=defs.find(p=>p.id==='pea'), openingSun=defs.find(p=>p.id==='sun');
-  const peaPos=cellCenter(2,2), sunPos=cellCenter(4,1);
-  plants.push({...openingPea,row:2,col:2,x:peaPos.x,y:peaPos.y,hp:openingPea.hp,maxHp:openingPea.hp,cool:.6});
-  plants.push({...openingSun,row:4,col:1,x:sunPos.x,y:sunPos.y,hp:openingSun.hp,maxHp:openingSun.hp,cool:4});
-  zombies.push({x:board.x+board.w-50,y:board.y+2*rh+rh/2-2,row:2,hp:105,maxHp:105,speed:13,bite:0,slow:0,phase:2,elite:false});
-  waveSpawned=1;spawned=1;
-  renderUnits();updateWaveUI();requestAnimationFrame(loop);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){if(!$('missionScreen').hidden)closeMissions();return;}
+    if(e.key.toLowerCase()==='m'){if($('missionScreen').hidden)openMissions();else closeMissions();return;}
+    if(e.code==='Space'){e.preventDefault();if($('missionScreen').hidden)togglePause();return;}
+    if(e.key>='1'&&e.key<='9'){const roster=levelRoster(),idx=+e.key-1;if(idx<roster.length){selected=roster[idx].id;renderUnits();}return;}
+    if(e.key.toLowerCase()==='r'&&$('missionScreen').hidden)startLevel(levelIndex);
+  });
+
+  let frame=0;
+  function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;update(dt);draw();frame=requestAnimationFrame(loop);}
+
+  startLevel(0,{silent:true});
+  openMissions();
+  requestAnimationFrame(loop);
 })();
